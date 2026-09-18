@@ -4,12 +4,11 @@ FastAPI service that finds a minimum-cost electricity schedule for 24 hours.
 Gemini interprets operator notes; a deterministic optimizer calculates the schedule;
 an independent validator checks every hour before results are returned.
 
-**Public sample-pack status:** the supplied **GridWise Public LLM-Assisted Sample
-Case Pack v2.0** reveals interpretation differences that still need fixing.
-The API now accepts the pack’s string-based operator notes.
-The optimizer matches all ten reference costs when given the reference directives,
-but the complete API is **not yet compatible with the pack unchanged**. See
-[Compatibility gaps](#compatibility-gaps) before using it for competition checks.
+**Public sample-pack status:** requests now accept string notes. The interpreter
+prompt handles unrelated notes as `no_op`, uses end-exclusive windows, and receives
+battery capacity for percentage reserves. The optimizer matches all ten supplied
+reference costs when given reference directives. Live Gemini interpretation across
+all ten cases still needs verification. See [Compatibility status](#compatibility-status).
 
 ## Start the backend
 
@@ -83,8 +82,8 @@ cases[]
 For competition-style evaluation, send **only `cases[i].input`** to the endpoint.
 Do not send `_meta`, the whole `cases` array, `expected_output`, or `rationale`.
 The reference answer is for checking results, not information to feed to Gemini.
-The API accepts this input shape. Interpretation still has the semantic gaps
-listed below.
+The API accepts this input shape. Verify the returned interpretation against
+the pack; model instructions alone do not guarantee semantic accuracy.
 
 ### Inputs
 
@@ -191,16 +190,14 @@ optimal schedule. Cost is the optimization objective, not peak reduction.
 Do not hard-code public note wording, scenario IDs, or reference schedules;
 hidden cases may paraphrase the same requirements.
 
-## Compatibility gaps
+## Compatibility status
 
-These are current implementation facts, not rules to copy into a competition solution.
-
-| Area | Public pack requires | Current backend | Required follow-up |
-| --- | --- | --- | --- |
-| Note input | Array of strings, 1–3 notes | Accepts strings and assigns indexes internally; also allows zero notes for baseline runs | Input format aligned |
-| Time windows | Exclude the ending hour | Gemini prompt and offline parser include it | Align interpretation and tests with end-exclusive windows |
-| Unrelated notes | `no_op` for distractors | Prompt only permits `no_op` for an explicit request for no constraints; offline parser rejects distractors | Teach relevance classification without ignoring meaningful constraints |
-| Percentage reserves | Convert percentage using capacity | Gemini receives notes only, without battery capacity | Supply needed scenario context and validate conversion |
+| Area | Implemented behavior | Verification still needed |
+| --- | --- | --- |
+| Note input | Strings, internally indexed; permits zero notes for baseline runs | Public pack uses 1–3 notes |
+| Time windows | Prompt and offline parser exclude ending hour | Live paraphrase interpretation |
+| Unrelated notes | Prompt requests `no_op` for irrelevant notes; ambiguous energy constraints remain unsupported | Live distractor classification |
+| Percentage reserves | Sends battery capacity and instructs percentage-to-kWh conversion | Live percentage interpretation |
 
 Send `operator_notes` as strings; do not wrap them in `note_index` / `text`
 objects. Indexes are assigned internally and returned in `directive_interpretation`.
@@ -228,8 +225,10 @@ During the earlier sample-pack review (before the string-note update):
 
 This verifies the deterministic optimizer against the pack's ground truth. It
 **does not** verify Gemini interpretation or demonstrate an end-to-end API pass.
-No live Gemini calls were made for this review. The subsequent string-note update fixes the request format only; it does not
-resolve the remaining interpretation gaps.
+No live Gemini calls were made for this review. Subsequent changes aligned the
+request format, prompt semantics, and offline windows; automated tests cover the
+request context and handling of mocked interpreted directives. They do not prove
+that Gemini will interpret every public or hidden note correctly.
 
 ## Current API contracts
 
@@ -275,7 +274,7 @@ implementation choices; the supplied public pack does not establish every possib
 overlap or overnight edge case. Replay tolerance is `1e-6` kWh.
 
 Gemini returns structured data validated with Pydantic before optimization. The
-backend currently sends only notes to Gemini. Model output is not trusted to
+backend sends indexed notes and battery capacity to Gemini. Model output is not trusted to
 calculate schedules or certify feasibility. Each HTTP operation has a 10-second
 timeout; transport failures and HTTP 429/500/502/503/504 get at most one retry after
 0.5 seconds. Invalid, blocked, or truncated output is rejected. The solver has a
@@ -301,7 +300,9 @@ No additional constraints
 ```
 
 It is case insensitive, accepts an optional final period, and supports `from H to H`
-or `between H and H`, with optional `:00`. Its current endpoints are inclusive.
+or `between H and H`, with optional `:00`. Windows exclude the ending hour;
+`0 to 24` covers the full day. Overnight windows wrap midnight; identical start
+and end hours are rejected as ambiguous.
 It is a local demo tool, **not a substitute for LLM interpretation of the public pack**.
 
 ## Frontend connection and storage

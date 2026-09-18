@@ -89,7 +89,7 @@ def test_directives(payload, kind, value):
 
 
 def test_infeasible(payload):
-    payload['operator_notes'] = ['Limit grid to 0 kWh from 0 to 23.']
+    payload['operator_notes'] = ['Limit grid to 0 kWh from 0 to 24.']
     response = client.post('/optimize-energy', json=payload)
     assert response.status_code == 409
     assert response.json()['error']['code'] == 'infeasible'
@@ -176,7 +176,7 @@ def test_overnight_and_noop(payload):
     payload['operator_notes'] = ['Do not charge the battery from 22:00 to 2:00.',
                                  'No additional constraints']
     ds = interpret(ScenarioCreate(**payload))
-    assert ds[0].structured_adjustment.hours == [0, 1, 2, 22, 23]
+    assert ds[0].structured_adjustment.hours == [0, 1, 22, 23]
     assert not ds[1].applies
 
 
@@ -216,7 +216,9 @@ def test_llm_pipeline(payload, monkeypatch, outcome, status, attempts):
         assert body['systemInstruction']['parts'][0]['text'] == module.PROMPT
         assert body['generationConfig']['responseMimeType'] == 'application/json'
         assert body['generationConfig']['responseJsonSchema'] == ParsedNotes.model_json_schema()
-        assert 'battery' not in json.loads(body['contents'][0]['parts'][0]['text'])[0]
+        context = json.loads(body['contents'][0]['parts'][0]['text'])
+        assert context['battery']['capacity_kwh'] == payload['battery']['capacity_kwh']
+        assert context['operator_notes'] == [{'note_index': 0, 'text': 'No constraints'}]
         if outcome == 'timeout': raise httpx.ReadTimeout('Timed out', request=request)
         if outcome == 'failure': raise httpx.ConnectError('Failed', request=request)
         if outcome == 'rate_limit': return httpx.Response(429)
@@ -359,3 +361,33 @@ def test_provider_logs_redact_notes_and_escape_newlines(monkeypatch, caplog):
     assert 'confidential operator note' not in caplog.text
     assert '\\n' in caplog.text
     assert 'High demand' not in error.message
+
+
+@pytest.mark.parametrize('text,hours', [
+    ('Do not charge the battery from 13 to 15.', [13, 14]),
+    ('Do not charge the battery from 0 to 24.', list(range(24))),
+    ('Do not discharge the battery from 22 to 0.', [22, 23]),
+])
+def test_end_exclusive_windows(payload, text, hours):
+    payload['operator_notes'] = [text]
+    ds = interpret(ScenarioCreate(**payload))
+    assert ds[0].structured_adjustment.hours == hours
+
+
+def test_distractor_pipeline(payload, monkeypatch):
+    import app.interpreter as module
+    monkeypatch.setenv('NOTE_INTERPRETER', 'gemini')
+    payload['operator_notes'] = [
+        'Solar output will drop to about 20% from 1 PM to 3 PM.',
+        'The sports office moved next month registration deadline.',
+    ]
+    monkeypatch.setattr(module, 'gemini_notes', lambda _: ParsedNotes(notes=[
+        directive('solar_reduction', [13, 14], .2), directive('no_op', [], index=1),
+    ]))
+    response = client.post('/optimize-energy', json=payload)
+    assert response.status_code == 200
+    ds = response.json()['directive_interpretation']
+    assert ds[1]['note_index'] == 1
+    assert ds[1]['applies'] is False
+    assert ds[1]['structured_adjustment'] is None
+    assert response.json()['validation']['valid']

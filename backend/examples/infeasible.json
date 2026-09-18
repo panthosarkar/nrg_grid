@@ -1,7 +1,7 @@
 {
   "scenario_id": "infeasible",
   "operator_notes": [
-    "Limit grid to 0 kWh from 0 to 23."
+    "Limit grid to 0 kWh from 0 to 24."
   ],
   "hours": [
     {
