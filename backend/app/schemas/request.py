@@ -2,7 +2,7 @@ from pydantic import BaseModel, ConfigDict, Field, field_validator, model_valida
 
 
 class HourData(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     hour: int = Field(..., ge=0, le=23)
     demand_kwh: float = Field(..., ge=0)
@@ -11,7 +11,7 @@ class HourData(BaseModel):
 
 
 class BatteryConfig(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     capacity_kwh: float = Field(..., gt=0)
     initial_energy_kwh: float = Field(..., ge=0)
@@ -31,14 +31,17 @@ class BatteryConfig(BaseModel):
                 "minimum_energy_kwh cannot exceed capacity_kwh"
             )
 
+        if self.initial_energy_kwh < self.minimum_energy_kwh:
+            raise ValueError("initial energy must be at least the minimum energy")
+
         return self
 
 
 class OperatorNote(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     note_index: int = Field(..., ge=0)
-    text: str = Field(..., min_length=1)
+    text: str = Field(..., min_length=1, max_length=1000)
 
     @field_validator("text")
     @classmethod
@@ -52,13 +55,13 @@ class OperatorNote(BaseModel):
 
 
 class ScenarioCreate(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     scenario_id: str = Field(..., min_length=1)
 
     operator_notes: list[OperatorNote] = Field(
         ...,
-        min_length=1,
+        min_length=0,
         max_length=3
     )
 

@@ -20,7 +20,7 @@ def validate_hours(hours: list[int]) -> list[int]:
 
 
 class SolarReductionAdjustment(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     hours: list[int]
     factor: float = Field(..., ge=0, le=1)
@@ -32,7 +32,7 @@ class SolarReductionAdjustment(BaseModel):
 
 
 class MinimumBatteryReserveAdjustment(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     hours: list[int]
     minimum_energy_kwh: float = Field(..., ge=0)
@@ -44,7 +44,7 @@ class MinimumBatteryReserveAdjustment(BaseModel):
 
 
 class WindowAdjustment(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     hours: list[int]
 
@@ -55,7 +55,7 @@ class WindowAdjustment(BaseModel):
 
 
 class MaxGridWindowAdjustment(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     hours: list[int]
     max_grid_kwh: float = Field(..., ge=0)
@@ -67,7 +67,7 @@ class MaxGridWindowAdjustment(BaseModel):
 
 
 class SolarReductionDirective(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     note_index: int = Field(..., ge=0)
     applies: Literal[True]
@@ -77,7 +77,7 @@ class SolarReductionDirective(BaseModel):
 
 
 class MinimumBatteryReserveDirective(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     note_index: int = Field(..., ge=0)
     applies: Literal[True]
@@ -87,7 +87,7 @@ class MinimumBatteryReserveDirective(BaseModel):
 
 
 class NoChargeWindowDirective(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     note_index: int = Field(..., ge=0)
     applies: Literal[True]
@@ -97,7 +97,7 @@ class NoChargeWindowDirective(BaseModel):
 
 
 class NoDischargeWindowDirective(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     note_index: int = Field(..., ge=0)
     applies: Literal[True]
@@ -107,7 +107,7 @@ class NoDischargeWindowDirective(BaseModel):
 
 
 class MaxGridWindowDirective(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     note_index: int = Field(..., ge=0)
     applies: Literal[True]
@@ -117,7 +117,7 @@ class MaxGridWindowDirective(BaseModel):
 
 
 class NoOpDirective(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     note_index: int = Field(..., ge=0)
     applies: Literal[False]

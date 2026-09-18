@@ -6,7 +6,7 @@ from app.schemas.directive import DirectiveInterpretation
 
 
 class HourlyPlan(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     hour: int = Field(..., ge=0, le=23)
     grid_kwh: float = Field(..., ge=0)
@@ -17,7 +17,7 @@ class HourlyPlan(BaseModel):
 
 
 class ValidationResult(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     valid: bool
     energy_balance: bool
@@ -28,9 +28,10 @@ class ValidationResult(BaseModel):
 
 
 class OptimizationResponse(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     scenario_id: str
+    validation: ValidationResult
 
     directive_interpretation: list[DirectiveInterpretation]
 
@@ -60,7 +61,7 @@ class OptimizationResponse(BaseModel):
 
 
 class OptimizationRunInDB(BaseModel):
-    model_config = ConfigDict(extra="forbid")
+    model_config = ConfigDict(extra="forbid", allow_inf_nan=False, strict=True)
 
     id: str
     run_id: str
