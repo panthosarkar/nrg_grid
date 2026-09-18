@@ -16,6 +16,7 @@ curl --max-time 120 --fail-with-body -sS \
 ```
 
 These requests invoke Gemini in default mode, consuming provider quota. Input
-acceptance alone does not prove correctness: time-window semantics, distractor
-handling, and percentage-reserve context still need alignment with the pack.
+acceptance alone does not prove correctness. The prompt now uses end-exclusive
+windows, handles irrelevant notes as no_op, and receives battery capacity. Verify
+live Gemini interpretations and optimal cost against each reference.
 See ../../README.md for reference costs and compatibility details.
