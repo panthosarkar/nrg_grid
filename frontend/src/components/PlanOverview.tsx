@@ -29,7 +29,7 @@ export function PlanOverview({
           </p>
           <h2>{scenario.name}</h2>
         </div>
-        <button className="outline-button" onClick={onExport}>
+        <button type="button" className="outline-button" onClick={onExport}>
           <DownloadSimple size={17} /> Export JSON
         </button>
       </div>

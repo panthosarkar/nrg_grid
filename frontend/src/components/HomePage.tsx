@@ -46,6 +46,22 @@ export default function HomePage() {
     }));
   }
 
+  function updateHour(
+    index: number,
+    field: "demand_kwh" | "solar_kwh" | "tariff_bdt_per_kwh",
+    value: string,
+  ) {
+    const next = Number(value);
+    setScenario((current) => ({
+      ...current,
+      hours: current.hours.map((hour, hourIndex) =>
+        hourIndex === index
+          ? { ...hour, [field]: Number.isFinite(next) ? next : 0 }
+          : hour,
+      ),
+    }));
+  }
+
   async function runOptimization() {
     setIsRunning(true);
     setMessage("");
@@ -88,6 +104,7 @@ export default function HomePage() {
           isRunning={isRunning}
           message={message}
           onScenarioChange={setScenario}
+          onHourChange={updateHour}
           onBatteryChange={updateBattery}
           onLoad={loadScenario}
           onRun={runOptimization}

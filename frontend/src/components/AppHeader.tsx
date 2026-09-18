@@ -20,8 +20,10 @@ export function AppHeader({ fileInputRef, onImport }: AppHeaderProps) {
         <span className="status-dot" /> Preview engine ready
       </div>
       <button
+        type="button"
         className="icon-button"
         title="Import scenario"
+        aria-label="Import scenario JSON"
         onClick={() => fileInputRef.current?.click()}
       >
         <UploadSimple size={19} />
