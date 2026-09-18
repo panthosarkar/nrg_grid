@@ -1,1 +1,1 @@
-{"error":{"code":"interpreter_failed","message":"The Gemini note interpretation provider failed."}}
+{"error":{"code":"gemini_model_unavailable","message":"The configured Gemini model is unavailable. Check GEMINI_MODEL on the backend."}}

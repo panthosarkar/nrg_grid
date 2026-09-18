@@ -1,3 +1,5 @@
+from typing import Annotated
+
 from pydantic import BaseModel, ConfigDict, Field, field_validator, model_validator
 
 
@@ -59,7 +61,7 @@ class ScenarioCreate(BaseModel):
 
     scenario_id: str = Field(..., min_length=1)
 
-    operator_notes: list[OperatorNote] = Field(
+    operator_notes: list[Annotated[str, Field(min_length=1, max_length=1000)]] = Field(
         ...,
         min_length=0,
         max_length=3
@@ -72,6 +74,20 @@ class ScenarioCreate(BaseModel):
     )
 
     battery: BatteryConfig
+
+    @field_validator("operator_notes")
+    @classmethod
+    def validate_notes(cls, notes: list[str]) -> list[str]:
+        cleaned = [note.strip() for note in notes]
+        if any(not note for note in cleaned):
+            raise ValueError("Operator note cannot be empty")
+        return cleaned
+
+    @property
+    def indexed_notes(self) -> list[OperatorNote]:
+        """Internal representation; clients supply only strings."""
+        return [OperatorNote(note_index=i, text=text)
+                for i, text in enumerate(self.operator_notes)]
 
     @field_validator("scenario_id")
     @classmethod
@@ -92,18 +108,6 @@ class ScenarioCreate(BaseModel):
             raise ValueError(
                 "hours must contain exactly 24 entries from 0 to 23 "
                 "in ascending order"
-            )
-
-        # Note indexes must be sequential: 0, 1, 2, ...
-        note_indexes = [
-            note.note_index for note in self.operator_notes
-        ]
-
-        expected_indexes = list(range(len(self.operator_notes)))
-
-        if note_indexes != expected_indexes:
-            raise ValueError(
-                "operator note indexes must start at 0 and be sequential"
             )
 
         return self

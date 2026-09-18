@@ -5,7 +5,8 @@ Gemini interprets operator notes; a deterministic optimizer calculates the sched
 an independent validator checks every hour before results are returned.
 
 **Public sample-pack status:** the supplied **GridWise Public LLM-Assisted Sample
-Case Pack v2.0** reveals API and interpretation differences that still need fixing.
+Case Pack v2.0** reveals interpretation differences that still need fixing.
+The API now accepts the pack’s string-based operator notes.
 The optimizer matches all ten reference costs when given the reference directives,
 but the complete API is **not yet compatible with the pack unchanged**. See
 [Compatibility gaps](#compatibility-gaps) before using it for competition checks.
@@ -82,8 +83,8 @@ cases[]
 For competition-style evaluation, send **only `cases[i].input`** to the endpoint.
 Do not send `_meta`, the whole `cases` array, `expected_output`, or `rationale`.
 The reference answer is for checking results, not information to feed to Gemini.
-The existing backend needs the compatibility changes below before accepting that
-input unchanged.
+The API accepts this input shape. Interpretation still has the semantic gaps
+listed below.
 
 ### Inputs
 
@@ -196,17 +197,27 @@ These are current implementation facts, not rules to copy into a competition sol
 
 | Area | Public pack requires | Current backend | Required follow-up |
 | --- | --- | --- | --- |
-| Note input | Array of strings, 1–3 notes | Canonical API expects indexed objects; allows 0–3 | Accept pack strings and assign indexes internally |
+| Note input | Array of strings, 1–3 notes | Accepts strings and assigns indexes internally; also allows zero notes for baseline runs | Input format aligned |
 | Time windows | Exclude the ending hour | Gemini prompt and offline parser include it | Align interpretation and tests with end-exclusive windows |
 | Unrelated notes | `no_op` for distractors | Prompt only permits `no_op` for an explicit request for no constraints; offline parser rejects distractors | Teach relevance classification without ignoring meaningful constraints |
 | Percentage reserves | Convert percentage using capacity | Gemini receives notes only, without battery capacity | Supply needed scenario context and validate conversion |
 
-Simply converting the string notes into indexed objects fixes **only the input
-shape**, not the interpretation differences. The frontend adapter accepts `notes`
-as strings, but also uses different scenario and battery field names; it does not
-make the public `scenario_id` / `operator_notes` payload compatible automatically.
+Send `operator_notes` as strings; do not wrap them in `note_index` / `text`
+objects. Indexes are assigned internally and returned in `directive_interpretation`.
+For example:
 
-During this documentation review:
+```json
+"operator_notes": [
+  "Solar output will drop to about 20% from 1 PM to 3 PM.",
+  "Do not charge the battery between 2 PM and 4 PM."
+]
+```
+
+This is a field excerpt; include `scenario_id`, `hours`, and `battery` in the full
+request. Natural-language notes require Gemini mode; offline mode still accepts
+only its documented templates.
+
+During the earlier sample-pack review (before the string-note update):
 
 - All ten unchanged `case.input` objects failed the current canonical schema.
 - After adapting note objects and supplying the pack's expected directives
@@ -217,8 +228,8 @@ During this documentation review:
 
 This verifies the deterministic optimizer against the pack's ground truth. It
 **does not** verify Gemini interpretation or demonstrate an end-to-end API pass.
-No live Gemini calls were made for this review. This README update does not change
-the API, interpreter, or solver behavior.
+No live Gemini calls were made for this review. The subsequent string-note update fixes the request format only; it does not
+resolve the remaining interpretation gaps.
 
 ## Current API contracts
 
@@ -228,7 +239,7 @@ examples and the schemas at `/docs`.
 | Field | Canonical backend request | Frontend request |
 | --- | --- | --- |
 | Scenario name/ID | `scenario_id` | `name` |
-| Operator notes | `operator_notes: [{"note_index":0,"text":"..."}]` | `notes: ["..."]` |
+| Operator notes | `operator_notes: ["..."]` | `notes: ["..."]` |
 | Charge limit | `battery.max_charge_kwh_per_hour` | `battery.max_charge_kwh` |
 | Discharge limit | `battery.max_discharge_kwh_per_hour` | `battery.max_discharge_kwh` |
 | Hours | Exactly 0–23, ascending | Exactly 0–23; sorted by adapter |

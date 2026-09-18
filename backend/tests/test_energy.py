@@ -34,7 +34,7 @@ def directive(kind, hours, value=None, index=0):
 
 
 def with_directives(payload, notes):
-    payload['operator_notes'] = [dict(note_index=i, text='test') for i in range(len(notes))]
+    payload['operator_notes'] = ['test' for _ in notes]
     scenario = ScenarioCreate(**payload)
     return scenario, validate_interpretations(scenario, ParsedNotes(notes=notes))
 
@@ -89,7 +89,7 @@ def test_directives(payload, kind, value):
 
 
 def test_infeasible(payload):
-    payload['operator_notes'] = [dict(note_index=0, text='Limit grid to 0 kWh from 0 to 23.')]
+    payload['operator_notes'] = ['Limit grid to 0 kWh from 0 to 23.']
     response = client.post('/optimize-energy', json=payload)
     assert response.status_code == 409
     assert response.json()['error']['code'] == 'infeasible'
@@ -166,15 +166,15 @@ def test_frontend_contract(payload):
 
 
 def test_rules_reject_ambiguity(payload):
-    payload['operator_notes'] = [dict(note_index=0, text='Keep plenty of battery for later')]
+    payload['operator_notes'] = ['Keep plenty of battery for later']
     response = client.post('/optimize-energy', json=payload)
     assert response.status_code == 422
     assert response.json()['error']['code'] == 'unsupported_note'
 
 
 def test_overnight_and_noop(payload):
-    payload['operator_notes'] = [dict(note_index=0, text='Do not charge the battery from 22:00 to 2:00.'),
-                                 dict(note_index=1, text='No additional constraints')]
+    payload['operator_notes'] = ['Do not charge the battery from 22:00 to 2:00.',
+                                 'No additional constraints']
     ds = interpret(ScenarioCreate(**payload))
     assert ds[0].structured_adjustment.hours == [0, 1, 2, 22, 23]
     assert not ds[1].applies
@@ -182,7 +182,7 @@ def test_overnight_and_noop(payload):
 
 @pytest.mark.parametrize('failure', ['missing', 'wrong_index', 'bad_factor', 'unsupported'])
 def test_invalid_interpretations(payload, failure):
-    payload['operator_notes'] = [dict(note_index=0, text='Test')]
+    payload['operator_notes'] = ['Test']
     notes = [directive('solar_reduction', [0], .5)]
     if failure == 'missing': notes = []
     if failure == 'wrong_index': notes[0].note_index = 1
@@ -204,7 +204,7 @@ def test_llm_pipeline(payload, monkeypatch, outcome, status, attempts):
     monkeypatch.setenv('GEMINI_API_KEY', 'test-only')
     monkeypatch.setenv('GEMINI_MODEL', 'gemini-test')
     monkeypatch.setattr(module.time, 'sleep', lambda _: None)
-    payload['operator_notes'] = [dict(note_index=0, text='No constraints')]
+    payload['operator_notes'] = ['No constraints']
     requests = []
 
     def handler(request):
@@ -244,7 +244,7 @@ def test_llm_pipeline(payload, monkeypatch, outcome, status, attempts):
 def test_gemini_is_default_and_requires_key(payload, monkeypatch):
     monkeypatch.delenv('NOTE_INTERPRETER', raising=False)
     monkeypatch.delenv('GEMINI_API_KEY', raising=False)
-    payload['operator_notes'] = [dict(note_index=0, text='No constraints')]
+    payload['operator_notes'] = ['No constraints']
     response = client.post('/optimize-energy', json=payload)
     assert response.status_code == 503
     assert response.json()['error']['code'] == 'interpreter_not_configured'
@@ -280,7 +280,7 @@ def test_documented_examples(name, status, cost):
 def test_provider_error_diagnostics(payload, monkeypatch, caplog, upstream, message, code):
     import app.interpreter as module
     monkeypatch.setenv('NOTE_INTERPRETER', 'gemini')
-    payload['operator_notes'] = [dict(note_index=0, text='No constraints')]
+    payload['operator_notes'] = ['No constraints']
     def fail(_):
         response = httpx.Response(upstream, json={'error': {'message': message}},
                                   request=httpx.Request('POST', 'https://example.com'))
@@ -292,3 +292,30 @@ def test_provider_error_diagnostics(payload, monkeypatch, caplog, upstream, mess
     assert f'upstream_http_status={upstream}' in caplog.text
     assert 'secret-test-value' not in response.text
     assert 'secret-test-value' not in caplog.text
+
+
+def test_string_notes_contract(payload):
+    payload['operator_notes'] = ['  No constraints  ', 'Do not charge the battery from 2 to 4.']
+    scenario = ScenarioCreate(**payload)
+    assert scenario.operator_notes[0] == 'No constraints'
+    assert [n.note_index for n in scenario.indexed_notes] == [0, 1]
+    response = client.post('/optimize-energy', json=payload)
+    assert response.status_code == 200
+    assert [d['note_index'] for d in response.json()['directive_interpretation']] == [0, 1]
+    schema = client.get('/openapi.json').json()['components']['schemas']['ScenarioCreate']
+    assert schema['properties']['operator_notes']['items']['type'] == 'string'
+
+
+@pytest.mark.parametrize('notes', [[' '], ['x' * 1001], [123], [{'note_index': 0, 'text': 'No constraints'}], ['x'] * 4])
+def test_invalid_string_notes(payload, notes):
+    payload['operator_notes'] = notes
+    assert client.post('/optimize-energy', json=payload).status_code == 422
+
+
+def test_requested_note_format(payload):
+    payload['operator_notes'] = [
+        'Solar output will drop to about 20% from 1 PM to 3 PM.',
+        'Do not charge the battery between 2 PM and 4 PM.',
+    ]
+    scenario = ScenarioCreate(**payload)
+    assert [n.text for n in scenario.indexed_notes] == payload['operator_notes']

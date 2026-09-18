@@ -83,7 +83,7 @@ def offline_note(note):
 
 
 def validate_interpretations(scenario, parsed):
-    if [n.note_index for n in parsed.notes] != [n.note_index for n in scenario.operator_notes]:
+    if [n.note_index for n in parsed.notes] != [n.note_index for n in scenario.indexed_notes]:
         raise ValueError(
             'The interpreter must return exactly one ordered result per note.')
     directives = []
@@ -120,7 +120,7 @@ def gemini_notes(scenario):
         'systemInstruction': {'parts': [{'text': PROMPT}]},
         'contents': [{'role': 'user', 'parts': [
             {'text': json.dumps([n.model_dump()
-                                for n in scenario.operator_notes])}
+                                for n in scenario.indexed_notes])}
         ]}],
         'generationConfig': {
             'responseMimeType': 'application/json',
@@ -189,13 +189,13 @@ def gemini_http_error(response):
 
 
 def interpret(scenario):
-    if not scenario.operator_notes:
+    if not scenario.indexed_notes:
         return []
     mode = os.getenv('NOTE_INTERPRETER', 'gemini')
     try:
         if mode == 'rules':
             parsed = ParsedNotes(notes=[offline_note(n)
-                                 for n in scenario.operator_notes])
+                                 for n in scenario.indexed_notes])
         elif mode == 'gemini':
             parsed = gemini_notes(scenario)
         else:

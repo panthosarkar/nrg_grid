@@ -26,7 +26,7 @@ class FrontendScenario(BaseModel):
         battery['max_discharge_kwh_per_hour'] = battery.pop('max_discharge_kwh')
         return ScenarioCreate(scenario_id=self.name, hours=sorted(self.hours, key=lambda h: h.hour),
                               battery=battery,
-                              operator_notes=[dict(note_index=i, text=n) for i, n in enumerate(self.notes)])
+                              operator_notes=self.notes)
 
 
 class FrontendHour(HourData):

@@ -71,7 +71,7 @@ def optimize_energy(payload: ScenarioCreate | FrontendScenario):
             battery_energy_kwh=p.battery_energy_after_kwh,
             cost_bdt=p.grid_kwh*h.tariff_bdt_per_kwh,
         ) for h, p in zip(scenario.hours, plans)], summary=summary, interpretations=[dict(
-            note=scenario.operator_notes[d.note_index].text, directive=d.directive_type,
+            note=scenario.operator_notes[d.note_index], directive=d.directive_type,
             explanation=d.explanation) for d in directives], validation=validation, **totals)
     return OptimizationResponse(scenario_id=scenario.scenario_id, directive_interpretation=directives,
                                 hourly_plan=plans, plan_summary=summary, validation=validation, **totals)
