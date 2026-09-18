@@ -1,36 +1,33 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# NRG Grid frontend
 
-## Getting Started
-
-First, run the development server:
+Next.js interface connected to the FastAPI optimizer through a server route.
 
 ```bash
+npm ci
+cp .env.example .env.local
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
+Start the backend separately using [its setup instructions](../backend/README.md).
+Open http://localhost:3000, edit the scenario, and click Optimize.
 
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
+The browser sends the complete scenario JSON to `POST /api/optimize-energy`.
+Next.js forwards it to FastAPI at `BACKEND_URL/optimize-energy` and preserves
+backend status codes and error messages. A successful response must include
+`validation.valid=true` before it is displayed as a validated plan.
 
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
+`BACKEND_URL` defaults to `http://127.0.0.1:8000` in development. Set it explicitly
+in production to the URL reachable from the Next.js server (in Docker, use the
+backend service hostname). The old `NEXT_PUBLIC_API_URL` setting is accepted as a
+server-side fallback. Gemini API keys belong only in the backend environment.
 
-## Learn More
+The initial baseline preview is labeled and does not apply notes. Optimize always
+calls the backend; network or interpretation failures produce an error. Editing
+inputs marks existing results as outdated until the next successful run.
 
-To learn more about Next.js, take a look at the following resources:
+No database is needed for this flow. State is held in the browser, and scenario
+inputs can be exported/imported as JSON. Saved runs and accounts would require
+persistent storage.
 
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
+Checks: `npm run lint`, `npm run build -- --webpack`.
+Production: `npm run build` then `npm start` (requires a Next.js server, not static export).

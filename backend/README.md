@@ -67,8 +67,12 @@ plus aggregate metrics and `validation`. Schedule rows include the original
 hourly inputs, `grid_kwh`, `solar_used_kwh`, `charge_kwh`, `discharge_kwh`,
 `battery_energy_kwh`, and `cost_bdt`.
 
-Set `NEXT_PUBLIC_API_URL=http://127.0.0.1:8000` in `frontend/.env.local` and restart
-Next.js. Without this variable, the UI deliberately uses its solar-first preview.
+Set `BACKEND_URL=http://127.0.0.1:8000` in `frontend/.env.local` and restart
+Next.js (this URL is the development default). The browser posts to Next.js at
+`/api/optimize-energy`, which forwards the body to this backend. Production
+requires `BACKEND_URL`; `NEXT_PUBLIC_API_URL` is accepted as a legacy fallback.
+The UI initially shows a baseline preview; Optimize always calls the API.
+Gemini credentials stay exclusively in the backend environment.
 
 ## Energy rules and directive semantics
 
@@ -170,8 +174,8 @@ docker run --rm -p 8000:8000 --env-file .env gridwise-api
 For Render, set root directory to `backend`, build command to
 `pip install -r requirements.txt`, start command to
 `uvicorn app.main:app --host 0.0.0.0 --port $PORT`, and health path to `/health`.
-Set `CORS_ORIGINS` to the deployed frontend origin. Set the frontend API URL before
-its build. Docker and public deployment have not been exercised by the unit suite.
+Set `CORS_ORIGINS` to the deployed frontend origin. Set `BACKEND_URL` in the frontend server environment. The proxy uses it at
+request time; browser CORS is unnecessary for the same-origin proxy path. Docker and public deployment have not been exercised by the unit suite.
 
 ## Layout
 

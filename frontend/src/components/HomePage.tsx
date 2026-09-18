@@ -20,6 +20,8 @@ import { ScheduleTable } from "./ScheduleTable";
 export default function HomePage() {
   const [scenario, setScenario] = useState<Scenario>(() => sampleScenario());
   const [plan, setPlan] = useState<Plan>(() => previewPlan(sampleScenario()));
+  const [planScenario, setPlanScenario] = useState<Scenario>(() => sampleScenario());
+  const isStale = JSON.stringify(scenario) !== JSON.stringify(planScenario);
   const [isRunning, setIsRunning] = useState(false);
   const [message, setMessage] = useState("");
   const fileInputRef = useRef<HTMLInputElement>(null);
@@ -29,6 +31,7 @@ export default function HomePage() {
       validateScenario(next);
       setScenario(next);
       setPlan(previewPlan(next));
+      setPlanScenario(next);
       setMessage("");
     } catch (error) {
       setMessage(error instanceof Error ? error.message : "Invalid scenario.");
@@ -68,6 +71,7 @@ export default function HomePage() {
     try {
       validateScenario(scenario);
       setPlan(await optimizeScenario(scenario));
+      setPlanScenario(scenario);
     } catch (error) {
       setMessage(
         error instanceof Error
@@ -110,9 +114,10 @@ export default function HomePage() {
           onRun={runOptimization}
         />
         <div className="results-column">
+          {isStale && <p role="status">Inputs changed. Run optimization to update these results.</p>}
           <PlanOverview
             plan={plan}
-            scenario={scenario}
+            scenario={planScenario}
             onExport={() =>
               downloadJson(
                 scenario,
@@ -120,12 +125,12 @@ export default function HomePage() {
               )
             }
           />
-          <ScheduleTable plan={plan} scenario={scenario} />
+          <ScheduleTable plan={plan} scenario={planScenario} />
         </div>
       </section>
       <footer>
         <span>NRG_Grid</span>
-        <span>Deterministic preview · {new Date().getFullYear()}</span>
+        <span>{plan.source === "optimized" ? "Validated optimization" : "Baseline preview"} · {new Date().getFullYear()}</span>
         <span>Optimizing for clarity, cost, and control</span>
       </footer>
     </main>

@@ -31,14 +31,16 @@ API docs: http://127.0.0.1:8000/docs. Health: http://127.0.0.1:8000/health.
 ```bash
 cd frontend
 npm ci
-# Add this line to .env.local:
-# NEXT_PUBLIC_API_URL=http://127.0.0.1:8000
+cp .env.example .env.local
+# BACKEND_URL defaults to http://127.0.0.1:8000 in development.
 npm run dev
 ```
 
 Open http://localhost:3000. Restart Next.js after changing `.env.local`.
-Without `NEXT_PUBLIC_API_URL`, the frontend displays its solar-first preview
-instead of calling the optimizer. Its sample reserve and charging-ban notes work
+The Optimize button calls `/api/optimize-energy` on Next.js, which forwards the
+JSON body to FastAPI. Set server-side `BACKEND_URL` to your deployed backend in
+production. The initial screen shows a labeled baseline preview until you run
+optimization; failures are displayed rather than replaced with a preview. Its sample reserve and charging-ban notes work
 with Gemini or the explicit offline interpreter (`NOTE_INTERPRETER=rules`).
 
 ## Try the API
@@ -91,7 +93,7 @@ phases.md                  Original eight-phase implementation roadmap
 ```
 
 Phases 1–5 have implementation and automated coverage. Phase 6's existing frontend
-contract is supported, but browser end-to-end verification remains. Phase 7 has
+is connected through a Next.js API route; browser interaction verification remains. Phase 7 has
 backend scenario coverage; live LLM paraphrase evaluation remains. Phase 8 has
 container/setup documentation; no public deployment has been performed. The
 competition's energy-rule assumptions still need confirmation against its statement.
@@ -99,3 +101,10 @@ competition's energy-rule assumptions still need confirmation against its statem
 Production backend command (from `backend/`):
 `uvicorn app.main:app --host 0.0.0.0 --port 8000`.
 Production frontend commands (from `frontend/`): `npm run build` then `npm start`.
+
+## Database
+
+A database is not required for the current workflow. Scenarios and results live
+in browser memory, and FastAPI computes each request without persistence. JSON
+export/import can retain scenario inputs. Add a database when you need saved
+scenarios, optimization history, user accounts, or shared plans.

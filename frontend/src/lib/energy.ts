@@ -26,6 +26,8 @@ export type PlanHour = Hour & {
   cost_bdt: number;
 };
 export type Plan = {
+  source: "preview" | "optimized";
+  validation?: { valid: boolean };
   schedule: PlanHour[];
   summary: string;
   interpretations: { note: string; directive: string; explanation: string }[];
@@ -115,17 +117,17 @@ export function validateScenario(value: unknown): asserts value is Scenario {
     );
   if (
     !Array.isArray(s.notes) ||
-    s.notes.length < 1 ||
     s.notes.length > 3 ||
     s.notes.some((n) => typeof n !== "string" || !n.trim() || n.length > 1000)
   )
-    throw new Error("Add 1–3 notes, each between 1 and 1,000 characters.");
+    throw new Error("Use up to 3 notes, each between 1 and 1,000 characters.");
 }
 
 // A transparent solar-first baseline, not an optimizer or an LLM simulation.
 export function previewPlan(s: Scenario): Plan {
   validateScenario(s);
   return {
+    source: "preview",
     schedule: [...s.hours]
       .sort((a, b) => a.hour - b.hour)
       .map((h) => {
@@ -147,7 +149,7 @@ export function previewPlan(s: Scenario): Plan {
       explanation: "Operator notes are not applied in preview mode.",
     })),
     summary:
-      "This preview uses available solar first and grid energy for the remaining demand. The battery stays at its initial energy. Connect the optimization API to apply operator notes and minimize cost.",
+      "This preview uses available solar first and grid energy for the remaining demand. The battery stays at its initial energy. Run optimization to apply operator notes and minimize cost.",
   };
 }
 
@@ -161,35 +163,33 @@ export function totals(plan: Plan) {
 }
 
 export async function optimizeScenario(scenario: Scenario): Promise<Plan> {
-  const url = process.env.NEXT_PUBLIC_API_URL;
-  if (!url) return previewPlan(scenario);
   validateScenario(scenario);
-  const response = await fetch(`${url.replace(/\/$/, "")}/optimize-energy`, {
-    method: "POST",
-    headers: { "Content-Type": "application/json" },
-    body: JSON.stringify(scenario),
-    signal: AbortSignal.timeout(45000),
-  });
-  if (!response.ok) {
-    if (response.status === 404)
-      throw new Error(
-        "The backend is reachable, but /optimize-energy is not implemented yet.",
-      );
-    if (response.status === 422)
-      throw new Error(
-        "The backend rejected this scenario. Check the inputs and API contract.",
-      );
-    if (response.status === 409)
-      throw new Error(
-        "No feasible schedule was found. Review battery limits and operator notes.",
-      );
+  let response: Response;
+  try {
+    response = await fetch("/api/optimize-energy", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify(scenario),
+      signal: AbortSignal.timeout(55000),
+    });
+  } catch (error) {
     throw new Error(
-      `Optimization failed (${response.status}). Please try again.`,
+      error instanceof Error && error.name === "TimeoutError"
+        ? "Optimization took too long. Please try again."
+        : "Cannot reach the optimization service. Check your connection and try again.",
+    );
+  }
+  if (!response.ok) {
+    const failure = await response.json().catch(() => null);
+    const message = failure?.error?.message;
+    throw new Error(
+      typeof message === "string" ? message : `Optimization failed (${response.status}). Please try again.`,
     );
   }
   const data = (await response.json()) as Plan;
   if (
     !data ||
+    data.validation?.valid !== true ||
     !Array.isArray(data.schedule) ||
     data.schedule.length !== 24 ||
     typeof data.summary !== "string" ||
@@ -232,7 +232,7 @@ export async function optimizeScenario(scenario: Scenario): Promise<Plan> {
   )
     throw new Error("The API returned invalid interpretation data.");
   data.schedule.sort((a, b) => a.hour - b.hour);
-  return data;
+  return { ...data, source: "optimized" };
 }
 
 export function downloadJson(value: unknown, filename: string) {

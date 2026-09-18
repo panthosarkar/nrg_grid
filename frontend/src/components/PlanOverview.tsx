@@ -25,7 +25,7 @@ export function PlanOverview({
       <div className="results-head">
         <div>
           <p className="section-kicker">
-            LIVE PLAN / {plan.schedule.length} HOURS
+            {plan.source === "optimized" ? "VALIDATED PLAN" : "BASELINE PREVIEW"} / {plan.schedule.length} HOURS
           </p>
           <h2>{scenario.name}</h2>
         </div>
