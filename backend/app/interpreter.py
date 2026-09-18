@@ -9,7 +9,7 @@ from typing import Literal
 import httpx
 from pydantic import BaseModel, ConfigDict, TypeAdapter, ValidationError
 
-from app.errors import EnergyError
+from app.errors import EnergyError, safe_provider_message
 from app.schemas.directive import DirectiveInterpretation
 
 ADAPTER = TypeAdapter(list[DirectiveInterpretation])
@@ -157,14 +157,16 @@ def gemini_notes(scenario):
     return ParsedNotes.model_validate_json(text, strict=True)
 
 
-def gemini_http_error(response):
-    """Classify upstream failures without exposing its body, credentials, or URLs."""
+def gemini_http_error(response, notes=()):
+    """Return safe public errors and log a redacted provider message privately."""
     status = response.status_code
     try:
         details = response.json().get('error', {})
-        message = str(details.get('message', '')).lower()
+        provider_message = str(details.get('message', ''))
+        message = provider_message.lower()
     except (ValueError, AttributeError, TypeError):
         message = ''
+        provider_message = 'No JSON error message received.'
     if status in (400, 401, 403) and 'leaked' in message:
         error = EnergyError(502, 'gemini_key_blocked',
                             'Google blocked the Gemini API key as leaked. Replace GEMINI_API_KEY on the backend and redeploy.')
@@ -184,7 +186,13 @@ def gemini_http_error(response):
     else:
         error = EnergyError(502, 'interpreter_failed',
                             f'Gemini returned HTTP {status}. Please retry; if it persists, check provider availability.')
-    logger.warning('Gemini request failed: upstream_http_status=%s code=%s', status, error.code)
+    key = os.getenv('GEMINI_API_KEY', '').strip()
+    diagnostic = {
+        'model': safe_provider_message(os.getenv('GEMINI_MODEL', 'gemini-3.6-flash'), key),
+        'provider_message': safe_provider_message(provider_message, key, notes),
+    }
+    logger.warning('Gemini request failed: upstream_http_status=%s code=%s diagnostic=%s',
+                   status, error.code, json.dumps(diagnostic, ensure_ascii=True))
     return error
 
 
@@ -206,7 +214,7 @@ def interpret(scenario):
         raise EnergyError(504, 'interpreter_timeout',
                           'Note interpretation timed out; please retry.') from exc
     except httpx.HTTPStatusError as exc:
-        raise gemini_http_error(exc.response) from exc
+        raise gemini_http_error(exc.response, scenario.operator_notes) from exc
     except httpx.HTTPError as exc:
         raise EnergyError(502, 'interpreter_failed',
                           'Could not connect to Gemini. Check backend network access and retry.') from exc

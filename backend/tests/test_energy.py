@@ -280,6 +280,7 @@ def test_documented_examples(name, status, cost):
 def test_provider_error_diagnostics(payload, monkeypatch, caplog, upstream, message, code):
     import app.interpreter as module
     monkeypatch.setenv('NOTE_INTERPRETER', 'gemini')
+    monkeypatch.setenv('GEMINI_API_KEY', 'secret-test-value')
     payload['operator_notes'] = ['No constraints']
     def fail(_):
         response = httpx.Response(upstream, json={'error': {'message': message}},
@@ -345,3 +346,16 @@ def test_gemini_diagnostic_checks_success(monkeypatch, capsys):
     monkeypatch.setattr(diagnostic, 'gemini_notes', lambda _: ParsedNotes(notes=[directive('no_op', [])]))
     assert diagnostic.main() == 0
     assert 'PASS:' in capsys.readouterr().out
+
+
+def test_provider_logs_redact_notes_and_escape_newlines(monkeypatch, caplog):
+    from app.interpreter import gemini_http_error
+    monkeypatch.setenv('GEMINI_API_KEY', 'private-key')
+    response = httpx.Response(503, json={'error': {
+        'message': 'High demand\nprivate-key confidential operator note'}})
+    error = gemini_http_error(response, ['confidential operator note'])
+    assert 'High demand' in caplog.text
+    assert 'private-key' not in caplog.text
+    assert 'confidential operator note' not in caplog.text
+    assert '\\n' in caplog.text
+    assert 'High demand' not in error.message

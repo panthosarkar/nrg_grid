@@ -396,8 +396,9 @@ Provider HTTP failures return 502 with a diagnostic code:
 | `gemini_request_rejected` | Check the request schema, model support, and project configuration |
 | `interpreter_failed` | Check provider availability or backend network access |
 
-Logs record the upstream HTTP status and diagnostic code, without provider response
-bodies, keys, or note text. Older deployments return only the generic
+Logs record the upstream HTTP status, diagnostic code, configured model, and
+Google’s error message. The configured API key and echoed operator notes are
+redacted; raw response bodies and request headers are not logged. Older deployments return only the generic
 `interpreter_failed` message; deploy the updated backend to get these diagnostics.
 
 Google documents that keys detected as leaked may be blocked:
@@ -428,3 +429,13 @@ If `GEMINI_API_KEY` is not exported, the diagnostic prompts for it securely. It
 does not read `.env` automatically. A local pass combined with a Render failure
 points to a deployment/environment difference; compare keys and settings without
 sharing credentials. Deploy this diagnostic module before running it on Render.
+
+### Diagnose from Render Logs without Shell access
+
+Deploy the latest backend and submit one note-containing request using the public
+curl command. In Render, open the service’s **Logs** view and find
+`Gemini request failed`. The line includes `upstream_http_status`, `code`, and a
+`diagnostic` object with the configured model and redacted `provider_message`.
+This does not require Shell access or a new public diagnostic endpoint. The public
+API response continues to omit provider details. Share the diagnostic line to
+investigate persistent 503 responses.

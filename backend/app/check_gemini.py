@@ -7,20 +7,12 @@ Never loads .env implicitly, logs the key, or dumps successful model output.
 import getpass
 import json
 import os
-import re
 
 import httpx
 
-from app.errors import EnergyError
+from app.errors import EnergyError, safe_provider_message
 from app.interpreter import gemini_notes, validate_interpretations
 from app.schemas.request import ScenarioCreate
-
-
-def safe_message(message: str, key: str) -> str:
-    if key:
-        message = message.replace(key, '[REDACTED]')
-    message = re.sub(r'AIza[\w-]+', '[REDACTED]', message)
-    return message[:2000]
 
 
 def main() -> int:
@@ -49,8 +41,8 @@ def main() -> int:
         except (ValueError, AttributeError):
             error = {}
         print(json.dumps({
-            'status': safe_message(str(error.get('status', 'unknown')), key),
-            'message': safe_message(str(error.get('message', 'No JSON error message received.')), key),
+            'status': safe_provider_message(str(error.get('status', 'unknown')), key),
+            'message': safe_provider_message(str(error.get('message', 'No JSON error message received.')), key),
         }, indent=2))
         return 1
     except httpx.HTTPError as exc:
