@@ -1,5 +1,6 @@
 """Strict offline syntax, or optional structured LLM interpretation."""
 import json
+import logging
 import os
 import re
 import time
@@ -12,6 +13,7 @@ from app.errors import EnergyError
 from app.schemas.directive import DirectiveInterpretation
 
 ADAPTER = TypeAdapter(list[DirectiveInterpretation])
+logger = logging.getLogger(__name__)
 
 
 class ParsedNote(BaseModel):
@@ -155,6 +157,37 @@ def gemini_notes(scenario):
     return ParsedNotes.model_validate_json(text, strict=True)
 
 
+def gemini_http_error(response):
+    """Classify upstream failures without exposing its body, credentials, or URLs."""
+    status = response.status_code
+    try:
+        details = response.json().get('error', {})
+        message = str(details.get('message', '')).lower()
+    except (ValueError, AttributeError, TypeError):
+        message = ''
+    if status in (400, 401, 403) and 'leaked' in message:
+        error = EnergyError(502, 'gemini_key_blocked',
+                            'Google blocked the Gemini API key as leaked. Replace GEMINI_API_KEY on the backend and redeploy.')
+    elif status in (401, 403) or (status == 400 and any(
+            phrase in message for phrase in ('api key not valid', 'api_key_invalid', 'invalid api key'))):
+        error = EnergyError(502, 'gemini_access_denied',
+                            'Gemini rejected the backend credentials or permissions. Check GEMINI_API_KEY and its API restrictions.')
+    elif status == 429:
+        error = EnergyError(502, 'gemini_quota_exceeded',
+                            'Gemini rate limit or quota exceeded. Check the Google AI project quota and billing, then retry.')
+    elif status == 404:
+        error = EnergyError(502, 'gemini_model_unavailable',
+                            'The configured Gemini model is unavailable. Check GEMINI_MODEL on the backend.')
+    elif status == 400:
+        error = EnergyError(502, 'gemini_request_rejected',
+                            'Gemini rejected the request. Check model support, request schema, and Google AI project configuration.')
+    else:
+        error = EnergyError(502, 'interpreter_failed',
+                            f'Gemini returned HTTP {status}. Please retry; if it persists, check provider availability.')
+    logger.warning('Gemini request failed: upstream_http_status=%s code=%s', status, error.code)
+    return error
+
+
 def interpret(scenario):
     if not scenario.operator_notes:
         return []
@@ -172,9 +205,11 @@ def interpret(scenario):
     except httpx.TimeoutException as exc:
         raise EnergyError(504, 'interpreter_timeout',
                           'Note interpretation timed out; please retry.') from exc
+    except httpx.HTTPStatusError as exc:
+        raise gemini_http_error(exc.response) from exc
     except httpx.HTTPError as exc:
         raise EnergyError(502, 'interpreter_failed',
-                          'The Gemini note interpretation provider failed.') from exc
+                          'Could not connect to Gemini. Check backend network access and retry.') from exc
     except (ValueError, ValidationError) as exc:
         raise EnergyError(502 if mode == 'gemini' else 422, 'invalid_interpretation',
                           'The note interpretation did not satisfy the directive contract.') from exc

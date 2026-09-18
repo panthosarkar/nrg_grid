@@ -265,3 +265,30 @@ def test_documented_examples(name, status, cost):
     assert response.status_code == status
     if cost is not None:
         assert response.json()['total_cost_bdt'] == pytest.approx(cost)
+
+
+@pytest.mark.parametrize('upstream,message,code', [
+    (403, 'Your API key was reported as leaked. secret-test-value', 'gemini_key_blocked'),
+    (400, 'API key not valid. secret-test-value', 'gemini_access_denied'),
+    (401, 'Invalid credentials secret-test-value', 'gemini_access_denied'),
+    (403, 'Permission denied secret-test-value', 'gemini_access_denied'),
+    (429, 'Quota exceeded secret-test-value', 'gemini_quota_exceeded'),
+    (404, 'Model not found secret-test-value', 'gemini_model_unavailable'),
+    (400, 'Invalid schema secret-test-value', 'gemini_request_rejected'),
+    (503, 'Unavailable secret-test-value', 'interpreter_failed'),
+])
+def test_provider_error_diagnostics(payload, monkeypatch, caplog, upstream, message, code):
+    import app.interpreter as module
+    monkeypatch.setenv('NOTE_INTERPRETER', 'gemini')
+    payload['operator_notes'] = [dict(note_index=0, text='No constraints')]
+    def fail(_):
+        response = httpx.Response(upstream, json={'error': {'message': message}},
+                                  request=httpx.Request('POST', 'https://example.com'))
+        response.raise_for_status()
+    monkeypatch.setattr(module, 'gemini_notes', fail)
+    response = client.post('/optimize-energy', json=payload)
+    assert response.status_code == 502
+    assert response.json()['error']['code'] == code
+    assert f'upstream_http_status={upstream}' in caplog.text
+    assert 'secret-test-value' not in response.text
+    assert 'secret-test-value' not in caplog.text
