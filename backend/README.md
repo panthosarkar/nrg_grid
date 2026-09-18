@@ -30,7 +30,7 @@ Set the following in your local `backend/.env`:
 ```dotenv
 NOTE_INTERPRETER=gemini
 GEMINI_API_KEY=your_local_key
-GEMINI_MODEL=gemini-2.5-flash
+GEMINI_MODEL=gemini-3.6-flash
 ```
 
 Keep real keys only in the ignored `.env` or deployment environment. Leave
@@ -285,7 +285,7 @@ timeout; transport failures and HTTP 429/500/502/503/504 get at most one retry a
 | --- | --- | --- |
 | `NOTE_INTERPRETER` | `gemini` | Gemini interpretation or explicit offline `rules` |
 | `GEMINI_API_KEY` | Unset | Backend-only credential |
-| `GEMINI_MODEL` | `gemini-2.5-flash` | Configurable model identifier |
+| `GEMINI_MODEL` | `gemini-3.6-flash` | Configurable model identifier |
 | `CORS_ORIGINS` | localhost and 127.0.0.1 on port 3000 | Comma-separated browser origins |
 | `PORT` | 8000 in Docker | Container port |
 
@@ -382,7 +382,7 @@ server. Docker and public deployment are not verified by the unit suite.
 
 The deployed service reads Render environment variables, not your local `.env`.
 Set `NOTE_INTERPRETER=gemini`, `GEMINI_API_KEY` to a valid replacement key, and
-`GEMINI_MODEL=gemini-2.5-flash`, then redeploy. Never put the key in the frontend or
+`GEMINI_MODEL=gemini-3.6-flash`, then redeploy. Never put the key in the frontend or
 tracked example files.
 
 Provider HTTP failures return 502 with a diagnostic code:
@@ -402,3 +402,29 @@ bodies, keys, or note text. Older deployments return only the generic
 
 Google documents that keys detected as leaked may be blocked:
 [Gemini troubleshooting](https://ai.google.dev/gemini-api/docs/troubleshooting).
+
+If `gemini_model_unavailable` persists even though your model appears in Google's
+model list, test an actual structured generation request in **Render Shell**, from
+its backend working directory:
+
+```bash
+python -m app.check_gemini
+```
+
+This uses Render's actual environment and the same request schema as the backend.
+It prints the selected model, upstream HTTP status, and Google's error message
+with the API key redacted. It makes a Gemini generation request and can consume
+quota. A successful model listing alone does not verify generation access.
+
+To compare with your local environment, run from the repository root:
+
+```bash
+cd backend
+source .venv/bin/activate
+GEMINI_MODEL=gemini-3.6-flash python -m app.check_gemini
+```
+
+If `GEMINI_API_KEY` is not exported, the diagnostic prompts for it securely. It
+does not read `.env` automatically. A local pass combined with a Render failure
+points to a deployment/environment difference; compare keys and settings without
+sharing credentials. Deploy this diagnostic module before running it on Render.

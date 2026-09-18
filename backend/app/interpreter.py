@@ -112,7 +112,7 @@ def validate_interpretations(scenario, parsed):
 
 def gemini_notes(scenario):
     key = os.getenv('GEMINI_API_KEY', '').strip()
-    model = os.getenv('GEMINI_MODEL', 'gemini-2.5-flash').strip()
+    model = os.getenv('GEMINI_MODEL', 'gemini-3.6-flash').strip()
     if not key or not re.fullmatch(r'gemini-[A-Za-z0-9._-]+', model):
         raise EnergyError(503, 'interpreter_not_configured',
                           'Set GEMINI_API_KEY and a valid GEMINI_MODEL on the backend.')

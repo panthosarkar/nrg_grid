@@ -59,7 +59,7 @@ energy. Other examples demonstrate operator constraints and infeasibility.
 See [backend/README.md](backend/README.md) for both request/response contracts,
 energy assumptions, supported notes, error codes, environment variables, and
 Docker/Render setup. Set `GEMINI_API_KEY` in `backend/.env`; the default model is
-`gemini-2.5-flash` (override with `GEMINI_MODEL`). Credentials belong in backend
+`gemini-3.6-flash` (override with `GEMINI_MODEL`). Credentials belong in backend
 environment variables only.
 
 ## Checks

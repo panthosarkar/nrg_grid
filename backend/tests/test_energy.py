@@ -319,3 +319,29 @@ def test_requested_note_format(payload):
     ]
     scenario = ScenarioCreate(**payload)
     assert [n.text for n in scenario.indexed_notes] == payload['operator_notes']
+
+
+def test_gemini_diagnostic_redacts_provider_message(monkeypatch, capsys):
+    import app.check_gemini as diagnostic
+    monkeypatch.setenv('GEMINI_API_KEY', 'private-diagnostic-key')
+    monkeypatch.setenv('GEMINI_MODEL', 'gemini-3.6-flash')
+    def fail(_):
+        response = httpx.Response(404, json={'error': {
+            'status': 'NOT_FOUND', 'message': 'Resource missing for private-diagnostic-key'}},
+            request=httpx.Request('POST', 'https://example.com'))
+        response.raise_for_status()
+    monkeypatch.setattr(diagnostic, 'gemini_notes', fail)
+    assert diagnostic.main() == 1
+    output = capsys.readouterr().out
+    assert 'NOT_FOUND' in output
+    assert '404' in output
+    assert 'private-diagnostic-key' not in output
+    assert '[REDACTED]' in output
+
+
+def test_gemini_diagnostic_checks_success(monkeypatch, capsys):
+    import app.check_gemini as diagnostic
+    monkeypatch.setenv('GEMINI_API_KEY', 'private-diagnostic-key')
+    monkeypatch.setattr(diagnostic, 'gemini_notes', lambda _: ParsedNotes(notes=[directive('no_op', [])]))
+    assert diagnostic.main() == 0
+    assert 'PASS:' in capsys.readouterr().out
